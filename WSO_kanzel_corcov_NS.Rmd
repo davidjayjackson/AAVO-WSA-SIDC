@@ -1,0 +1,342 @@
+---
+title: "WSO North/South polar fields and Kanzel North South sunspots "
+author: "WSO data;  http://wso.stanford.edu/Polar.html"
+date: "7/03/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,fig.width=9, fig.height=6)
+library(tidyverse)
+library(lubridate)
+library(pracma)
+theme_set(theme_light())
+
+```
+
+### Pull in data and remove unneeded fields
+
+```{r}
+rm(list=ls())
+WSO <- read_csv("/Users/howe/Desktop/WSO/kanzel_wso.csv")
+WSO <- WSO %>% select(-a,-obs,-hhmm)
+summary(WSO)
+```
+
+### Quick plot of R North & R South Jan. 1995 - Present
+
+```{r}
+WSO %>% filter(Ymd >="1995-01-01") %>%
+  ggplot() + 
+  geom_line(aes(x=Ymd,y=g_n,col="North"),col="blue") +
+  geom_line(aes(x=Ymd,y=g_s,col="South"),col="red") +
+  labs(title="WSO Daily North/South Groups: 1995 - Present, North=blue, South=red",
+       x="Date of Observations",y="Daily N/S groups")
+```
+
+### Calculate Weekly Mean and Medians for All North and South Polar Fields Fields
+
+```{r}
+K2 <- WSO %>% group_by(Weekly = floor_date(Ymd,"week")) %>%
+        summarise(across(g_n:Rr, list(Mean = mean, Median = median)))
+        
+```
+```{r}
+K2 %>% filter(Weekly >="1995-01-01") %>%
+  ggplot() + geom_line(aes(x=Weekly,y=R_n_Mean,col="Polar Fields North"),col="blue") +
+  geom_line(aes(x=Weekly,y=R_s_Mean,col="Polar Fields South"),col="red") +
+  labs(title="WSO Weekly Mean North/South Polar Fields: 1995 - Present, North=blue, South=red",
+       x="Weekly Dates",y="Weekly Mean Polar Fields")
+```
+```{r}
+K2 %>% filter(Weekly >="1995-01-01") %>%
+  ggplot() + geom_line(aes(x=Weekly,y=R_n_Median,col="Polar Fields North"),col="blue") +
+  geom_line(aes(x=Weekly,y=R_s_Median,col="Polar Fields South"),col="red") +
+  labs(title="WSO Weekly  Median North/South Polar Fields: 1995 - Present, North=blue, South=red",
+       x="Weekly Dates",y="Weekly Median Polar Fields")
+```
+Now look at covariance and rolling corelations for both North,South
+
+```{r}
+##############################################################
+# Initialization
+##############################################################
+
+library(MASS)
+library(stats)
+library(graphics)
+library(xtable)
+library(ggplot2)
+require(fBasics)
+library(PerformanceAnalytics)
+
+options(digits=4)
+
+##########################################################
+#     Functions
+##########################################################
+
+fetch <- function(fn,ext) {# fn <- Ex
+	infile <- paste0(WD, "/", fn, ".", ext)
+     X <- data.frame(read.csv(infile, header=TRUE))
+	}
+
+WriteCSV <- function(RdataSet, CSVfileName) {
+	outfile <- paste(WD, CSVfileName, sep="/")
+	write.csv(RdataSet, file=outfile, row.names=F)
+	}
+
+X <- WSO
+summary(X)
+nrow(X)
+H <- X     # hold modified data losing original raw data
+
+######################################################
+     part <- "VAR"  # multivariate time series for the North
+######################################################
+
+(Ex <- "WSO_PF_N")
+(ver <- "WSO")    
+
+X$ymd <- as.character(X$Ymd)
+#str(X)
+
+#require(MTS)
+X$ymd <- as.character(paste(as.character(X$ymd),sep="-"))
+z <- data.frame(diff(X$R_n),diff(X$KN),row.names=X$ymd[-1])
+summary(z)
+colnames(z) <- c("R_n","KN")
+#str(z)
+
+cor.fun <- function(x){
+  cor(x)[1,2]
+  }
+
+cov.fun <- function(x){
+  cov(x)[1,2]
+  }
+
+#Differenced data
+
+
+# pick days for the plots
+width <- 2* 22
+#width <- 2* 60
+#width <- 2* 90
+#width <- 2*180
+#width <- 2*360
+
+roll.cov <- rollapply(zoo(z), FUN=cov.fun, width=width, by.column=FALSE, align="right")
+
+roll.cor <- rollapply(zoo(z), FUN=cor.fun, width=width, by.column=FALSE, align="right")
+ mean(roll.cor)
+ summary(roll.cor)
+ 
+plot.ts(X[,c("R_n","KN")],col=c(1,2),plot.type="multiple",main="WSO North, Kanzel North")
+#x11()
+
+par(mfrow=c(2,1))
+plot(roll.cov, main="Rolling Covariance",
+      ylab="Covariance", lwd=2, col="blue")
+grid()
+abline(h=cov(z)[1,2], lwd=2, col="red")
+plot(roll.cor, main="Rolling Correlations",
+      ylab="Correlation", lwd=2, col="blue")
+grid()
+abline(h=cor(z)[1,2], lwd=2, col="red")
+par(mfrow=c(1,1))
+#x11()
+
+a <- data.frame(z,ret=z[,1],row.names=row.names(z))
+#head(a)
+#summary(a)
+#nrow(a)
+
+# Rolling correlation can be used to examine how relationships between two datasets change over time.
+   yl <- "RollCorr_N"
+   xl <- ""
+  ilk <- width
+  (main <- paste0("WSO_N,KN Numbers Rolling ", ilk, "-Day Correlation ", xl))
+ (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, yl, "By", xl, ilk, ".png"))
+png(loc)
+	chart.RollingCorrelation(a[, 1, drop=FALSE], a[, 2, drop=FALSE], colorset=rich8equal, legend.loc="bottomright", width=2*as.numeric(ilk), main = main)
+	dev.off()
+
+cor(z[,1:2])
+
+######################################################
+     part <- "Cov"  # write out cor data to .csv file
+######################################################
+(Ex <- "WSO_PF")
+(ver <- "Cov") 
+#  average the daily averages to make average weekly, an average of averages
+#G <- aggregate(a$ret, list(Wolf=a$Wolf,SR=a$SR), "mean")
+G <- aggregate(a$ret, list(North_pf=a$R_n,Kanzel_N=a$KN), "mean")
+names(G)[3] <- "Cov"
+#G$Cor <- round(G$Cor)
+#G
+X$ymd <- as.character(X$Ymd)
+#str(X)
+RC <- cbind(X$ymd, roll.cov)
+#summary(RC)
+
+
+######################################################
+     part <- "Volatility"  # volatility models
+######################################################
+
+(Ex <- "WSO_PF")
+(ver <- "WSO")  
+
+X$ymd <- as.character(X$Ymd)
+#str(X)
+
+# scatterplot to see if there's any obvious correlation
+
+   yl <- "R_n"
+   xl <- "KN"
+  (is <- coef(lm(R_n ~ KN, data = z)))
+(main <- paste(part, yl,"vs", xl))
+ (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, "Scatter", yl, "By", xl, ".png"))
+   gp <- ggplot(z, aes(x=R_n, y=KN)) +
+         geom_abline(intercept=is[[1]], slope=is[[2]]) +
+         geom_point(col='grey45') + 
+#         ylim(0,4) +
+#         xlim(0.75,2.05) +
+         ggtitle(main) + 
+         xlab(xl) + 
+         ylab(yl) +
+         geom_point(col='grey45') + 
+         theme(axis.text=element_text(size=16)) +
+         theme(axis.title=element_text(size=20)) +
+         theme(plot.title=element_text(size=20,hjust = 0.5)) +
+         theme(panel.background = element_rect(fill = "grey92"))
+         ggsave(loc)
+
+         
+######################################################
+     part <- "VAR"  # multivariate time series for the South
+######################################################
+
+(Ex <- "WSO_PF_S")
+(ver <- "WSO")    
+
+X$ymd <- as.character(X$Ymd)
+#str(X)
+
+#require(MTS)
+X$ymd <- as.character(paste(as.character(X$ymd),sep="-"))
+z <- data.frame(diff(X$R_s),diff(X$KS),row.names=X$ymd[-1])
+summary(z)
+colnames(z) <- c("R_s","KS")
+#str(z)
+
+cor.fun <- function(x){
+  cor(x)[1,2]
+  }
+
+cov.fun <- function(x){
+  cov(x)[1,2]
+  }
+
+#Differenced data
+
+
+# pick days for the plots
+width <- 2* 22
+#width <- 2* 60
+#width <- 2* 90
+#width <- 2*180
+#width <- 2*360
+
+roll.cov <- rollapply(zoo(z), FUN=cov.fun, width=width, by.column=FALSE, align="right")
+
+roll.cor <- rollapply(zoo(z), FUN=cor.fun, width=width, by.column=FALSE, align="right")
+ mean(roll.cor)
+ summary(roll.cor)
+ 
+plot.ts(X[,c("R_s","KS")],col=c(1,2),plot.type="multiple",main="WSO South, Kanzel South")
+#x11()
+
+par(mfrow=c(2,1))
+plot(roll.cov, main="Rolling Covariance",
+      ylab="Covariance", lwd=2, col="blue")
+grid()
+abline(h=cov(z)[1,2], lwd=2, col="red")
+plot(roll.cor, main="Rolling Correlations",
+      ylab="Correlation", lwd=2, col="blue")
+grid()
+abline(h=cor(z)[1,2], lwd=2, col="red")
+par(mfrow=c(1,1))
+#x11()
+
+a <- data.frame(z,ret=z[,1],row.names=row.names(z))
+#head(a)
+#summary(a)
+#nrow(a)
+
+# Rolling correlation can be used to examine how relationships between two datasets change over time.
+   yl <- "RollCorr_S"
+   xl <- ""
+  ilk <- width
+  (main <- paste0("WSO_S,KS Numbers Rolling ", ilk, "-Day Correlation ", xl))
+ (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, yl, "By", xl, ilk, ".png"))
+png(loc)
+	chart.RollingCorrelation(a[, 1, drop=FALSE], a[, 2, drop=FALSE], colorset=rich8equal, legend.loc="bottomright", width=2*as.numeric(ilk), main = main)
+	dev.off()
+
+cor(z[,1:2])
+
+######################################################
+     part <- "Cov"  # write out cor data to .csv file
+######################################################
+(Ex <- "WSO_PF")
+(ver <- "Cov") 
+#  average the daily averages to make average weekly, an average of averages
+#G <- aggregate(a$ret, list(Wolf=a$Wolf,SR=a$SR), "mean")
+G <- aggregate(a$ret, list(South_pf=a$R_s,Kanzel_S=a$KS), "mean")
+names(G)[3] <- "Cov"
+#G$Cor <- round(G$Cor)
+#G
+X$ymd <- as.character(X$Ymd)
+#str(X)
+RC <- cbind(X$ymd, roll.cov)
+#summary(RC)
+
+
+######################################################
+     part <- "Volatility"  # volatility models
+######################################################
+
+(Ex <- "WSO_PF")
+(ver <- "WSO")  
+
+X$ymd <- as.character(X$Ymd)
+#str(X)
+
+# scatterplot to see if there's any obvious correlation
+
+   yl <- "R_s"
+   xl <- "KS"
+  (is <- coef(lm(R_s ~ KS, data = z)))
+(main <- paste(part, yl,"vs", xl))
+ (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, "Scatter", yl, "By", xl, ".png"))
+   gp <- ggplot(z, aes(x=R_s, y=KS)) +
+         geom_abline(intercept=is[[1]], slope=is[[2]]) +
+         geom_point(col='grey45') + 
+#         ylim(0,4) +
+#         xlim(0.75,2.05) +
+         ggtitle(main) + 
+         xlab(xl) + 
+         ylab(yl) +
+         geom_point(col='grey45') + 
+         theme(axis.text=element_text(size=16)) +
+         theme(axis.title=element_text(size=20)) +
+         theme(plot.title=element_text(size=20,hjust = 0.5)) +
+         theme(panel.background = element_rect(fill = "grey92"))
+         ggsave(loc)
+
+
+```
+
+```
