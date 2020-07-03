@@ -16,16 +16,16 @@ theme_set(theme_light())
 
 ### Pull in data and remove unneeded fields
 
-```{r}
+```{r, echo=FALSE}
 rm(list=ls())
-WSO <- read_csv("/Users/howe/Desktop/WSO/kanzel_wso.csv")
+WSO <- read_csv("./kanzel_wso.csv")
 WSO <- WSO %>% select(-a,-obs,-hhmm)
 summary(WSO)
 ```
 
 ### Quick plot of R North & R South Jan. 1995 - Present
 
-```{r}
+```{r, echo=FALSE}
 WSO %>% filter(Ymd >="1995-01-01") %>%
   ggplot() + 
   geom_line(aes(x=Ymd,y=g_n,col="North"),col="blue") +
@@ -36,28 +36,29 @@ WSO %>% filter(Ymd >="1995-01-01") %>%
 
 ### Calculate Weekly Mean and Medians for All North and South Polar Fields Fields
 
-```{r}
+```{r,echo=FALSE}
 K2 <- WSO %>% group_by(Weekly = floor_date(Ymd,"week")) %>%
         summarise(across(g_n:Rr, list(Mean = mean, Median = median)))
         
 ```
-```{r}
+```{r,echo=FALSE}
 K2 %>% filter(Weekly >="1995-01-01") %>%
   ggplot() + geom_line(aes(x=Weekly,y=R_n_Mean,col="Polar Fields North"),col="blue") +
   geom_line(aes(x=Weekly,y=R_s_Mean,col="Polar Fields South"),col="red") +
   labs(title="WSO Weekly Mean North/South Polar Fields: 1995 - Present, North=blue, South=red",
        x="Weekly Dates",y="Weekly Mean Polar Fields")
 ```
-```{r}
+```{r,echo=FALSE}
 K2 %>% filter(Weekly >="1995-01-01") %>%
   ggplot() + geom_line(aes(x=Weekly,y=R_n_Median,col="Polar Fields North"),col="blue") +
   geom_line(aes(x=Weekly,y=R_s_Median,col="Polar Fields South"),col="red") +
   labs(title="WSO Weekly  Median North/South Polar Fields: 1995 - Present, North=blue, South=red",
        x="Weekly Dates",y="Weekly Median Polar Fields")
 ```
+
 Now look at covariance and rolling corelations for both North,South
 
-```{r}
+```{r,echo=FALSE}
 ##############################################################
 # Initialization
 ##############################################################
@@ -157,7 +158,7 @@ a <- data.frame(z,ret=z[,1],row.names=row.names(z))
    xl <- ""
   ilk <- width
   (main <- paste0("WSO_N,KN Numbers Rolling ", ilk, "-Day Correlation ", xl))
- (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, yl, "By", xl, ilk, ".png"))
+ (loc <- paste0("./", Ex, ver, part, yl, "By", xl, ilk, ".png"))
 png(loc)
 	chart.RollingCorrelation(a[, 1, drop=FALSE], a[, 2, drop=FALSE], colorset=rich8equal, legend.loc="bottomright", width=2*as.numeric(ilk), main = main)
 	dev.off()
@@ -197,7 +198,7 @@ X$ymd <- as.character(X$Ymd)
    xl <- "KN"
   (is <- coef(lm(R_n ~ KN, data = z)))
 (main <- paste(part, yl,"vs", xl))
- (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, "Scatter", yl, "By", xl, ".png"))
+ (loc <- paste0("./", Ex, ver, part, "Scatter", yl, "By", xl, ".png"))
    gp <- ggplot(z, aes(x=R_n, y=KN)) +
          geom_abline(intercept=is[[1]], slope=is[[2]]) +
          geom_point(col='grey45') + 
@@ -280,7 +281,7 @@ a <- data.frame(z,ret=z[,1],row.names=row.names(z))
    xl <- ""
   ilk <- width
   (main <- paste0("WSO_S,KS Numbers Rolling ", ilk, "-Day Correlation ", xl))
- (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, yl, "By", xl, ilk, ".png"))
+ (loc <- paste0("./", Ex, ver, part, yl, "By", xl, ilk, ".png"))
 png(loc)
 	chart.RollingCorrelation(a[, 1, drop=FALSE], a[, 2, drop=FALSE], colorset=rich8equal, legend.loc="bottomright", width=2*as.numeric(ilk), main = main)
 	dev.off()
@@ -320,7 +321,7 @@ X$ymd <- as.character(X$Ymd)
    xl <- "KS"
   (is <- coef(lm(R_s ~ KS, data = z)))
 (main <- paste(part, yl,"vs", xl))
- (loc <- paste0("/Users/howe/Desktop/WSO/", Ex, ver, part, "Scatter", yl, "By", xl, ".png"))
+ (loc <- paste0("./", Ex, ver, part, "Scatter", yl, "By", xl, ".png"))
    gp <- ggplot(z, aes(x=R_s, y=KS)) +
          geom_abline(intercept=is[[1]], slope=is[[2]]) +
          geom_point(col='grey45') + 
